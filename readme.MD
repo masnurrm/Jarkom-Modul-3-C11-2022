@@ -15,12 +15,12 @@
 
 Laporan ini berisi penjelasan dari soal-soal yang dikerjakan pada modul 3 hingga masa revisi selesai.
 
-### **Soal 1**
-**Wise akan dijadikan sebagai DNS Master, Berlint akan dijadikan DNS Slave, dan Eden akan digunakan sebagai Web Server. Terdapat 2 Client yaitu SSS, dan Garden. Semua node terhubung pada router Ostania, sehingga dapat mengakses internet**
+### **Persiapan**
+**Sebelum pengerjaan soal, perlu dibuat topologi dengan konfigurasinya**
 
 ![Gambar Topologi yang Dibuat](./img/Topologi.png)
 
-Setelah mengatur susunan topologi, selanjutnya dilakukan beberapa konfigurasi untuk tiap node dan juga router pada setiap port yang digunakan atau tersambung.
+Setelah mengatur susunan topologi, selanjutnya dilakukan beberapa konfigurasi untuk tiap *node* dan juga *router* pada setiap *port* yang digunakan atau tersambung. Awalnya, semua node akan di-*assign* IP secara manual (static IP)
 
 - **Konfigurasi IP Address**
 
@@ -28,7 +28,7 @@ Setelah mengatur susunan topologi, selanjutnya dilakukan beberapa konfigurasi un
 
     ```bash
     auto eth0
-        iface eth0 inet dhcp
+        
 
     auto eth1
         iface eth1 inet static
@@ -46,7 +46,7 @@ Setelah mengatur susunan topologi, selanjutnya dilakukan beberapa konfigurasi un
         netmask 255.255.255.0
     ```
 
-    Konfigurasi SSS
+    Konfigurasi SSS (IP Address: 10.15.1.2)
 
     ```bash
     auto eth0
@@ -56,7 +56,7 @@ Setelah mengatur susunan topologi, selanjutnya dilakukan beberapa konfigurasi un
         gateway 10.15.1.1
     ```
 
-    Konfigurasi Garden
+    Konfigurasi Garden (IP Address: 10.15.1.3)
 
     ```bash
     auto eth0
@@ -66,7 +66,7 @@ Setelah mengatur susunan topologi, selanjutnya dilakukan beberapa konfigurasi un
         gateway 10.15.1.1
     ```
 
-    Konfigurasi Wise
+    Konfigurasi Wise (IP Address: 10.15.2.2)
 
     ```bash
     auto eth0
@@ -76,7 +76,27 @@ Setelah mengatur susunan topologi, selanjutnya dilakukan beberapa konfigurasi un
         gateway 10.15.2.1
     ```
 
-    Konfigurasi Berlint
+    Konfigurasi Berlint (IP Address: 10.15.2.3)
+
+    ```bash
+    auto eth0
+        iface eth0 inet static
+        address 10.15.2.3
+        netmask 255.255.255.0
+        gateway 10.15.2.1
+    ```
+
+    Konfigurasi Westalis (IP Address: 10.15.2.4)
+
+    ```bash
+    auto eth0
+        iface eth0 inet static
+        address 10.15.2.4
+        netmask 255.255.255.0
+        gateway 10.15.2.1
+    ```
+
+    Konfigurasi KemonoPark (IP Address: 10.15.3.2)
 
     ```bash
     auto eth0
@@ -86,15 +106,26 @@ Setelah mengatur susunan topologi, selanjutnya dilakukan beberapa konfigurasi un
         gateway 10.15.3.1
     ```
 
-    Konfigurasi Eden
+    Konfigurasi NewstonCastle (IP Address: 10.15.3.3)
 
     ```bash
     auto eth0
         iface eth0 inet static
-        address 10.15.3.3
+        address 10.15.3.2
         netmask 255.255.255.0
         gateway 10.15.3.1
     ```
+
+    Konfigurasi Eden (IP Address: 10.15.3.4)
+
+    ```bash
+    auto eth0
+        iface eth0 inet static
+        address 10.15.3.2
+        netmask 255.255.255.0
+        gateway 10.15.3.1
+    ```
+
 
 - Konfigurasi Router (Ostania)
 
@@ -111,91 +142,52 @@ Setelah mengatur susunan topologi, selanjutnya dilakukan beberapa konfigurasi un
     Untuk node Wise sebagai DNS Master
 
     ```bash
-    echo 'nameserver 192.168.122.1
-    nameserver 8.8.8.8 ' > /etc/resolv.conf
-    ```
-
-    Untuk node Berlint
-    
-    ```bash
-    echo 'nameserver 10.15.2.2 ' > /etc/resolv.conf
-
-    ```
-
-    Untuk node Garden dan SSS
-
-    ```bash
-    echo 'nameserver 10.15.2.2
-    nameserver 10.15.3.2 ' > /etc/resolv.conf
-    ```
-
-    Untuk node Eden
-
-    ```bash
-    echo 'nameserver 10.15.3.2
-    nameserver 10.15.2.2 ' > /etc/resolv.conf   
+    echo 'nameserver 192.168.122.1 ' > /etc/resolv.conf
     ```
 
 </br>
 
-### **Soal 2**
-**Untuk mempermudah mendapatkan informasi mengenai misi dari Handler, bantulah Loid membuat website utama dengan akses wise.yyy.com dengan alias www.wise.yyy.com pada folder wise**
+### **Soal 1**
+**Loid bersama Franky berencana membuat peta tersebut dengan kriteria WISE sebagai DNS Server, Westalis sebagai DHCP Server, Berlint sebagai Proxy Server**
 
-Pada console Wise dilakukan konfigurasi sebagai berikut untuk menjadi DNS Master. Pertama, dilakukan instalasi bind9 agar dapat dilakukan koneksi dengan node lain.
+- Pertama, pada Wise dilakukan penginstalan `bind9` untuk menjadi DNS server.
 
 ```bash
 apt-get update
 apt-get install bind9 -y
+service bind9 start
 ```
 
-Kedua, buat zone baru untuk mendaftarkan `wise.c11.com` dan menjadikannya sebagai DNS master. Masukkan konfigurasi ke dalam `/etc/bind/named.conf.local`.
-```bash
-echo ’zone "wise.c11.com" {
-	type master;
-	file "/etc/bind/jarkom/wise.c11.com";
-}; ’ > /etc/bind/named.conf.local
-```
-
-Ketiga, buat folder baru `jarkom` di dalam `/etc/bind/`.
+- Kedua, pada Westalis dilakukan penginstalan `isc-dhcp-server` untuk menjadi DHCP server. Selain itu, juga dilakukan pendaftaran interface untuk menjadi jalan bagi node client untuk terhubung dengan DHCP server. Untuk kasus ini, maka interface tersebut adalah `eth0`. Interface tersebut didaftarkan pada `/etc/default/isc-dhcp-server`.
 
 ```bash
-rm -r /etc/bind/jarkom
-mkdir /etc/bind/jarkom
+apt-get update
+apt-get install isc-dhcp-server -y
+
+echo ‘INTERFACES="eth0" ‘ > /etc/default/isc-dhcp-server
+
+service isc-dhcp-server start
 ```
 
-Keempat, copy isi dari `/etc/bind/db.local` ke dalam `/etc/bind/jarkom/wise.c11.com` yang baru dibuat untuk menangani DNS `wise.c11.com`.
+- Ketiga, pada Berlint dilakukan penginstalan `squid` untuk menjadi proxy server.
 
 ```bash
-cp /etc/bind/db.local /etc/bind/jarkom/wise.c11.com
+apt-get update
+apt-get install squid -y
+service squid start
+
+apt-get install php -y
+apt-get install apache2 -y
+apt-get install libapache2-mod-php7.0 -y
 ```
 
-Kelima, atur SOA dari wise.c11.com termasuk CNAME, Alias, dan Nameserver.
+Pengetesan dilakukan dengan melakukan pengecekan status dari masing-masing *service* yang telah terpasang.
 
-```bash
-echo ‘;
-; BIND data file for local loopback interface
-;
-$TTL    604800
-@       IN      SOA     wise.c11.com. root.wise.c11.com. (
-                              2         ; Serial
-                         604800         ; Refresh
-                          86400         ; Retry
-                        2419200         ; Expire
-                         604800 )       ; Negative Cache TTL
-;
-@       IN      NS      wise.c11.com.
-@       IN      A       10.15.2.2
-@       IN      AAAA    ::1 
-www      IN      CNAME   wise.c11.com.’ > /etc/bind/jarkom/wise.c11.com
-```
+![Tes Wise](./img/hasil-1-1.png)
 
-Terakhir, restart bind9.
+![Tes Westalis](./img/hasil-1-2.png)
 
-```bash
-service bind9 restart
-```
-
-Pengetesan dilakukan dengan melakukan `ping wise.c11.com` atau `ping www.wise.c11.com` pada node client (Garden atau SSS). Bukti terlampir pada folder `img`.
+![Tes Berlint](./img/hasil-1-3.png)
 
 </br>
 
