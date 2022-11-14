@@ -225,353 +225,471 @@ Pengetesan dilakukan dengan melakukan pengecekan status dari masing-masing *serv
 
 </br>
 
-### **Soal 4**
-**Buat juga reverse domain untuk domain utama**
+### **Soal 3, 4, dan 5**
+**Loid dan Franky menyusun peta tersebut dengan hati-hati dan teliti.**
 
-Pada console Wise dilakukan konfigurasi sebagai berikut. Pertama, buat zone baru untuk hasil reverse PTR sebagai berikut.
+**Ada beberapa kriteria yang ingin dibuat oleh Loid dan Franky, yaitu:**
+**Semua client yang ada HARUS menggunakan konfigurasi IP dari DHCP Server.**
+**Client yang melalui Switch1 mendapatkan range IP dari [prefix IP].1.50 - [prefix IP].1.88 dan [prefix IP].1.120 - [prefix IP].1.155**
+**Client yang melalui Switch3 mendapatkan range IP dari [prefix IP].3.10 - [prefix IP].3.30 dan [prefix IP].3.60 - [prefix IP].3.85**
 
-```bash
-#10.15.2
+Ketiga soal ini dikerjakan menjadi satu karena sangat saling bergantung satu sama lain.
 
-echo ‘zone "2.15.10.in-addr.arpa" {
-    type master;
-    file "/etc/bind/jarkom/2.15.10.in-addr.arpa";
-}; ‘ > nano /etc/bind/named.conf.local
-```
-
-Kedua, copy isi dari `/etc/bind/db.local` ke dalam `/etc/bind/jarkom/2.15.10.in-addr.arpa` yang selanjutnya akan digunakan untuk wadah dari hasil reverse PTR.
+- Pertama, pada Westalis
 
 ```bash
-cp /etc/bind/db.local /etc/bind/jarkom/2.15.10.in-addr.arpa
+echo ‘subnet 10.15.1.0 netmask 255.255.255.0 {
+    range 10.15.1.50 10.15.1.88;
+    range 10.15.1.120 10.15.1.155;
+    option routers 10.15.1.1;
+    option broadcast-address 10.15.1.255;
+}
+subnet 10.15.2.0 netmask 255.255.255.0 {
+}
+subnet 10.15.3.0 netmask 255.255.255.0 {
+    range 10.15.3.10 10.15.3.30;
+    range 10.15.3.60 10.15.3.85;
+    option routers 10.15.3.1;
+    option broadcast-address 10.15.3.255;
+} ‘ > /etc/dhcp/dhcpd.conf
+
+service isc-dhcp-server stop
+service isc-dhcp-server start
 ```
 
-Ketiga, atur SOA untuk reverse PTR sebagai berikut. NS dan PTR tetap mengarah pada `wise.c11.com`.
+- Kedua, pada setiap node client 
 
 ```bash
-echo ‘;
-; BIND data file for local loopback interface
-;
-$TTL    604800
-@       IN      SOA     wise.c11.com. root.wise.c11.com. (
-                              2         ; Serial
-                         604800         ; Refresh
-                          86400         ; Retry
-                        2419200         ; Expire
-                         604800 )       ; Negative Cache TTL
-;
-2.15.10.in-addr.arpa.	IN	NS	wise.c11.com.
-2	IN	PTR	wise.c11.com. ‘ > /etc/bind/jarkom/2.15.10.in-addr.arpa
+echo ‘auto eth0
+iface eth0 inet dhcp ‘ > /etc/network/interfaces
 ```
 
-Terakhir, restart bind9.
+Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematikan lalu menyalakannya lagi. Pertama, dilakukan pada node client dengan subnet 10.15.1.0 (Switch 1). Kemudian, dilakukan pada node client dengan subnet 10.15.3.0 (Switch 3)
 
-```bash
-service bind9 restart
-```
+![Tes DHCP](./img/hasil-345-1.png)
 
-Pengetesan dilakukan dengan melakukan `host -t PTR 10.15.2.2` (IP Wise) pada node client (Garden atau SSS). Bukti terlampir pada folder `img`.
-
-</br>
-
-### **Soal 5**
-**Agar dapat tetap dihubungi jika server WISE bermasalah, buatlah juga Berlint sebagai DNS Slave untuk domain utama**
-
-Pada console Wise dilakukan konfigurasi sebagai berikut. Pertama, lakukan konfigurasi zone pada Wise sebagai berikut sehingga layanan dari Wise dapat diturunkan ke Berlint (10.15.3.2).
-
-```bash
-echo ’zone "wise.c11.com" {
-type master;
-notify yes;
-also-notify { 10.15.3.2; }; 
-allow-transfer { 10.15.3.2; }; 
-	file "/etc/bind/jarkom/wise.c11.com";
-}; 
-zone "2.15.10.in-addr.arpa" {
-    type master;
-    file "/etc/bind/jarkom/2.15.10.in-addr.arpa";
-}; ‘ > nano /etc/bind/named.conf.local
-```
-
-Kedua, pada console Berlint juga dilakukan konfigurasi sebagai berikut dengan instalasi bind9 serta membuat zona `wise.c11.com` namun sebagai slave yang mengarah ke masters Wise (10.15.2.2).
-
-```bash
-apt-get update
-apt-get install bind9 -y
-
-echo ‘zone "wise.c11.com" {
-    type slave;
-    masters { 10.15.2.2; }; 
-    file "/var/lib/bind/wise.c11.com";
-}; ‘ > /etc/bind/named.conf.local
-```
-
-Terakhir, restart bind9.
-
-```bash
-service bind9 restart
-```
-
-Pengetesan dilakukan dengan melakukan `ping wise.c11.com` atau `ping www.wise.c11.com` pada node client (Garden atau SSS). Bukti terlampir pada folder `img`.
+![Tes DHCP](./img/hasil-345-2.png)
 
 </br>
 
 ### **Soal 6**
-**Karena banyak informasi dari Handler, buatlah subdomain yang khusus untuk operation yaitu operation.wise.yyy.com dengan alias www.operation.wise.yyy.com yang didelegasikan dari WISE ke Berlint dengan IP menuju ke Eden dalam folder operation**
+**Client mendapatkan DNS dari WISE dan client dapat terhubung dengan internet melalui DNS tersebut.**
 
-Pada console Wise dilakukan konfigurasi sebagai berikut.
-
-```bash
-echo 'options {
-        directory "/var/cache/bind";
-        allow-query{any;};
-        auth-nxdomain no;
-        listen-on-v6 { any; };
-}; ' > /etc/bind/named.conf.options
-
-echo 'zone "wise.c11.com" {
-    type slave;
-    masters { 10.15.2.2; };
-    file "/var/lib/bind/wise.c11.com";
-};
-zone "operation.wise.c11.com" {
-    type master;
-    file "/etc/bind/operation/operation.wise.c11.com";
-}; ' > /etc/bind/named.conf.local
-
-rm -r /etc/bind/operation
-mkdir /etc/bind/operation
-cp /etc/bind/db.local /etc/bind/operation/operation.wise.c11.com
-
-echo ';
-; BIND data file for local loopback interface
-;
-$TTL    604800
-@       IN      SOA      operation.wise.c11.com. root.operation.wise.c11.com. (
-                              2         ; Serial
-                         604800         ; Refresh
-                          86400         ; Retry
-                        2419200         ; Expire
-                         604800 )       ; Negative Cache TTL
-;
-@       IN      NS      operation.wise.c11.com.
-@       IN      A       10.15.3.3
-www     IN      CNAME   operation.wise.c11.com. ' > /etc/bind/operation/operation.wise.c11.com
-
-service bind9 restart
-```
-
-Pada console Berlint dilakukan konfigurasi sebagai berikut.
+- Pertama, pada Wise
 
 ```bash
-echo ‘zone "wise.c11.com" {
-    type slave;
-    masters { 10.15.2.2; };
-    file "/var/lib/bind/wise.c11.com";
-};
-zone "operation.wise.c11.com" {
-    type master;
-    file "/etc/bind/operation/operation.wise.c11.com";
-}; ’ > /etc/bind/named.conf.local
-
 echo ‘options {
         directory "/var/cache/bind";
-        allow-query{any;};
 
+        forwarders {
+                192.168.122.1;
+       };
+
+        // dnssec-validation auto;
+        allow-query{any;};
         auth-nxdomain no;    # conform to RFC1035
         listen-on-v6 { any; };
-}; ’ > /etc/bind/named.conf.options
-
-rm -r /etc/bind/operation
-mkdir /etc/bind/operation
-cp /etc/bind/db.local /etc/bind/operation/wise.c11.com
-
-echo ‘;
-; BIND data file for local loopback interface
-;
-$TTL    604800
-@       IN      SOA      operation.wise.c11.com. root.operation.wise.c11.com. (
-                              2         ; Serial
-                         604800         ; Refresh
-                          86400         ; Retry
-                        2419200         ; Expire
-                         604800 )       ; Negative Cache TTL
-;
-@       IN      NS     operation.wise.c11.com.
-@       IN      A       10.15.3.3
-www	IN	CNAME	operation.wise.c11.com.
-strix	IN	A	 10.15.3.3
-www.strix	IN	CNAME	10.15.3.3 ‘ > /etc/bind/operation/operation.wise.c11.com
-
-service bind9 restart
+}; ‘ > /etc/bind/named.conf.options
 ```
 
-Pengetesan dilakukan dengan melakukan `ping operation.wise.c11.com` atau `ping www.operation.wise.c11.com` pada node client (Garden atau SSS). Bukti terlampir pada folder `img`.
+- Kedua, pada Westalis
+
+```bash
+echo ‘subnet 10.15.1.0 netmask 255.255.255.0 {
+    range 10.15.1.50 10.15.1.88;
+    range 10.15.1.120 10.15.1.155;
+    option routers 10.15.1.1;
+    option broadcast-address 10.15.1.255;
+    option domain-name-servers 10.15.2.2;
+}
+subnet 10.15.2.0 netmask 255.255.255.0 {
+}
+subnet 10.15.3.0 netmask 255.255.255.0 {
+    range 10.15.3.10 10.15.3.30;
+    range 10.15.3.60 10.15.3.85;
+    option routers 10.15.3.1;
+    option broadcast-address 10.15.3.255;
+    option domain-name-servers 10.15.2.2;
+} ‘ > /etc/dhcp/dhcpd.conf
+
+service isc-dhcp-server stop
+service isc-dhcp-server start
+```
+
+Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematikan lalu menyalakannya lagi. Pertama, dilakukan pada node client dengan subnet 10.15.1.0 (Switch 1). Kemudian, dilakukan pada node client dengan subnet 10.15.3.0 (Switch 3)
+
+![Tes DHCP DNS](./img/hasil-6-1.png)
+
+![Tes DHCP DNS](./img/hasil-6-2.png)
 
 
 </br>
 
 ### **Soal 7**
-**Untuk informasi yang lebih spesifik mengenai Operation Strix, buatlah subdomain melalui Berlint dengan akses strix.operation.wise.yyy.com dengan alias www.strix.operation.wise.yyy.com yang mengarah ke Eden**
+**Lama waktu DHCP server meminjamkan alamat IP kepada Client yang melalui Switch1 selama 5 menit sedangkan pada client yang melalui Switch3 selama 10 menit. Dengan waktu maksimal yang dialokasikan untuk peminjaman alamat IP selama 115 menit.**
 
-Pada console Berlint dilakukan konfigurasi sebagai berikut.
+Pada Westalis
 
 ```bash
-echo ';
-; BIND data file for local loopback interface
-;
-$TTL    604800
-@       IN      SOA      operation.wise.c11.com. root.operation.wise.c11.com. (
-                              2         ; Serial
-                         604800         ; Refresh
-                          86400         ; Retry
-                        2419200         ; Expire
-                         604800 )       ; Negative Cache TTL
-;
-@       IN      NS      operation.wise.c11.com.
-@       IN      A       10.15.3.3
-www     IN      CNAME   operation.wise.c11.com.
-strix           IN      A       10.15.3.3
-www.strix       IN      A       10.15.3.3 ' > /etc/bind/operation/operation.wise.c11.com
+echo ‘subnet 10.15.1.0 netmask 255.255.255.0 {
+    range 10.15.1.50 10.15.1.88;
+    range 10.15.1.120 10.15.1.155;
+    option routers 10.15.1.1;
+    option broadcast-address 10.15.1.255;
+    option domain-name-servers 10.15.2.2;
+    default-lease-time 300;
+    max-lease-time 6900;
+
+}
+subnet 10.15.2.0 netmask 255.255.255.0 {
+}
+subnet 10.15.3.0 netmask 255.255.255.0 {
+    range 10.15.3.10 10.15.3.30;
+    range 10.15.3.60 10.15.3.85;
+    option routers 10.15.3.1;
+    option broadcast-address 10.15.3.255;
+    option domain-name-servers 10.15.2.2;
+    default-lease-time 600;
+    max-lease-time 6900;
+
+} ‘ > /etc/dhcp/dhcpd.conf
+
+service isc-dhcp-server stop
+service isc-dhcp-server start
 ```
 
-Pengetesan dilakukan dengan melakukan `ping strix.operation.wise.c11.com` atau `ping www.strix.operation.wise.c11.com` pada node client (Garden atau SSS). Bukti terlampir pada folder `img`.
+Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematikan lalu menyalakannya lagi. Pertama, dilakukan pada node client dengan subnet 10.15.1.0 (Switch 1). Kemudian, dilakukan pada node client dengan subnet 10.15.3.0 (Switch 3)
+
+![Tes DHCP Lease](./img/hasil-7-1.png)
+
+![Tes DHCP Lease](./img/hasil-7-2.png)
+
 
 </br>
 
 ### **Soal 8**
-**Setelah melakukan konfigurasi server, maka dilakukan konfigurasi Webserver. Pertama dengan webserver www.wise.yyy.com. Pertama, Loid membutuhkan webserver dengan DocumentRoot pada /var/www/wise.yyy.com**
+**Untuk informasi yang lebih spesifik mengenai Operation Strix, buatlah subdomain melalui Berlint dengan akses strix.operation.wise.yyy.com dengan alias www.strix.operation.wise.yyy.com yang mengarah ke Eden**
 
-Pada console Wise dilakukan konfigurasi sebagai berikut.
+- Pertama, pada Westalis ditambahkan
 
 ```bash
-cp /etc/bind/wise/2.15.10.in-addr.arpa /etc/bind/wise/3.15.10.in-addr.arpa
+host Eden {
+    hardware ethernet 5a:4f:c1:11:9f:cd; 
+    fixed-address 10.15.3.13;
+}
+
+service isc-dhcp-server stop
+service isc-dhcp-server start
+```
+
+- Kedua, pada Eden dilakukan
+
+```bash
+echo ‘auto eth0
+iface eth0 inet dhcp
+hwaddress ether 5a:4f:c1:11:9f:cd ‘ > /etc/network/interfaces
+```
+
+Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematikan lalu menyalakannya lagi. Pertama, dilakukan pada node client dengan subnet 10.15.1.0 (Switch 1). Kemudian, dilakukan pada node client dengan subnet 10.15.3.0 (Switch 3)
+
+![Tes DHCP Fixed](./img/hasil-8-1.png)
+
+![Tes DHCP Fixed](./img/hasil-8-2.png)
+
+</br>
+
+### **Soal 9**
+**SSS digunakan sebagai client Proxy agar pertukaran informasi dapat terjamin keamanannya, juga untuk mencegah kebocoran data. Pada Proxy Server di SSS, Loid berencana untuk mengatur bagaimana Client dapat mengakses internet. Artinya setiap client harus menggunakan SSS sebagai HTTP dan HTTPS proxy.**
+
+- Pertama, pada Berlint
+
+```bash
+apt-get update
+apt-get install squid -y
+service squid start
+
+apt-get install php -y
+apt-get install apache2 -y
+apt-get install libapache2-mod-php7.0 -y
+
+mv /etc/squid/squid.conf /etc/squid/squid.conf.bak
+
+echo ‘http_port 8080
+visible_hostname Berlint ‘ > /etc/squid/squid.conf
+
+service squid restart
+```
+
+- Kedua, pada SSS 
+
+```bash
+export http_proxy="http://10.15.2.3:8080"
+apt-get update
+apt-get install lynx
+```
+
+Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematikan lalu menyalakannya lagi. Pertama, dilakukan pada node client dengan subnet 10.15.1.0 (Switch 1). Kemudian, dilakukan pada node client dengan subnet 10.15.3.0 (Switch 3)
+
+![Tes Client Proxy](./img/hasil-9-1.png)
+
+![Tes Client Proxy](./img/hasil-9-2.png)
+
+
+</br>
+
+### **Soal 10**
+**Client hanya dapat mengakses internet diluar (selain) hari dan jam kerja (senin-jumat 08.00 - 17.00) dan hari libur (dapat mengakses 24 jam penuh)**
+
+Pada Berlint, dilakukan
+
+```bash
+echo 'nameserver 192.168.122.1 ' > /etc/resolv.conf
+
+apt-get update
+apt-get install squid -y
+service squid start
+
+apt-get install php -y
+apt-get install apache2 -y
+apt-get install libapache2-mod-php7.0 -y
+
+mv /etc/squid/squid.conf /etc/squid/squid.conf.bak
+
+echo 'acl WORKDAYS time MTWHF 08:00-17:00
+acl HOLIDAYS time AS 00:00-23:59 ' > /etc/squid/acl.conf
+
+echo 'include /etc/squid/acl.conf
+
+http_port 5000
+visible_hostname Berlint
+http_access allow HOLIDAYS
+http_access deny WORKDAYS
+http_access allow all ' > /etc/squid/squid.conf
+
+service squid restart
+```
+
+</br>
+
+### **Soal 11**
+**Adapun pada hari dan jam kerja sesuai nomor sebelumnya, client hanya dapat mengakses domain loid-work.com dan franky-work.com**
+
+- Pertama, pada Wise dilakukan
+
+```bash
+# echo ’zone "franky-work.com" {
+#	type master;
+#	file "/etc/bind/jarkom/franky-work.com";
+#}; 
+echo ’zone "loid-work.com" {
+	type master;
+	file "/etc/bind/jarkom/loid-work.com";
+}; ’ > /etc/bind/named.conf.local
+
+rm -r /etc/bind/jarkom
+mkdir /etc/bind/jarkom
+
+# cp /etc/bind/db.local /etc/bind/jarkom/franky-work.com
+cp /etc/bind/db.local /etc/bind/jarkom/loid-work.com
 
 echo ‘;
 ; BIND data file for local loopback interface
 ;
 $TTL    604800
-@       IN      SOA     wise.c11.com. root.wise.c11.com. (
+@       IN      SOA     loid-work.com. root.loid-work.com. (
                               2         ; Serial
                          604800         ; Refresh
                           86400         ; Retry
                         2419200         ; Expire
                          604800 )       ; Negative Cache TTL
 ;
-3.15.10.in-addr.arpa.       IN      NS      wise.c11.com.
-2       IN      PTR      wise.c11.com. ’ > /etc/bind/wise/3.15.10.in-addr.arpa
-
-
-echo ‘zone "wise.c11.com" {
-    type master;
-    file "/etc/bind/wise/wise.c11.com";
-    allow-transfer { 192.175.3.2; };
-};
-zone "3.15.10.in-addr.arpa" {
-    type master;
-    file "/etc/bind/wise/3.15.10.in-addr.arpa";
-}; ’ > /etc/bind/named.conf.local
-
-
-echo ';
-; BIND data file for local loopback interface
-;
-$TTL    604800
-@       IN      SOA     wise.c11.com. root.wise.c11.com. (
-                              2         ; Serial
-                         604800         ; Refresh
-                          86400         ; Retry
-                        2419200         ; Expire
-                         604800 )       ; Negative Cache TTL
-;
-@       IN      NS      wise.c11.com.
-@       IN      A       10.15.3.3
-www     IN      CNAME   wise.c11.com.
-eden    IN      A       10.15.3.3
-www.eden        IN      CNAME   eden.wise.c11.com.
-ns1     IN      A       10.15.3.3
-operation       IN      NS      ns1
-@       IN      AAAA    ::1 ' > /etc/bind/wise/wise.c11.com
-
-service bind9 restart
+@       IN      NS      loid-work.com.
+@       IN      A       216.239.38.120
+@       IN      AAAA    ::1 
+www      IN      CNAME   loid-work.com.’ > /etc/bind/jarkom/loid-work.com
 ```
 
-Pada console Wise dilakukan konfigurasi sebagai berikut.
+- Kedua, pada Berlint dilakukan
 
 ```bash
+
+```
+
+</br>
+
+### **Soal 12**
+**Saat akses internet dibuka, client dilarang untuk mengakses web tanpa HTTPS. (Contoh web HTTP: http://example.com)**
+
+Pada Berlint, dilakukan
+
+```bash
+echo 'nameserver 192.168.122.1 ' > /etc/resolv.conf
+
 apt-get update
-apt-get install apache2
-service apache2 start
-apt-get install php
-apt-get install libapache2-mod-php7.0
-apt-get install wget -y
-apt-get install unzip -y
+apt-get install squid -y
+service squid start
 
-cp /etc/apache2/sites-available/000-default.conf /etc/apache2/sites-available/wise.c11.com.conf
+apt-get install php -y
+apt-get install apache2 -y
+apt-get install libapache2-mod-php7.0 -y
 
-echo '<VirtualHost *:80>
-        ServerAdmin webmaster@localhost
-        DocumentRoot /var/www/wise.c11.com
-        ServerName wise.c11.com
-        ServerAlias www.wise.c11.com
+mv /etc/squid/squid.conf /etc/squid/squid.conf.bak
 
+echo 'acl WORKDAYS time MTWHF 08:00-17:00
+acl HOLIDAYS time AS 00:00-23:59
+acl DISHTTP url_regex ^http:.*$
+acl WHITELISTS dstdomain loid-work.com franky-work.com
 
-        ErrorLog ${APACHE_LOG_DIR}/error.log
-        CustomLog ${APACHE_LOG_DIR}/access.log combined
-</VirtualHost> ' > /etc/apache2/sites-available/wise.c11.com.conf
+ ' > /etc/squid/acl.conf
 
-mkdir /var/www/wise.c11.com
-wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1S0XhL9ViYN7TyCj2W66BNEXQD2AAAw2e' -O /var/www/wise.zip
-unzip /var/www/wise.zip -d /var/www
-cp /var/www/wise/* /var/www/wise.c11.com
+echo 'include /etc/squid/acl.conf
 
-a2ensite wise.c11.com
-service apache2 restart
-service apache2 reload
+http_port 5000
+visible_hostname Berlint
+
+http_access allow WHITELISTS WORKDAYS
+http_access deny WORKDAYS
+http_access deny DISHTTP ' > /etc/squid/squid.conf
+
+service squid restart
 ```
 
-Pada console Wise dilakukan konfigurasi sebagai berikut.
+</br>
+
+### **Soal 13**
+**Agar menghemat penggunaan, akses internet dibatasi dengan kecepatan maksimum 128 Kbps pada setiap host (Kbps = kilobit per second; lakukan pengecekan pada tiap host, ketika 2 host akses internet pada saat bersamaan, keduanya mendapatkan speed maksimal yaitu 128 Kbps)**
+
+Pada Berlint, dilakukan
 
 ```bash
-echo ‘nameserver 10.15.2.2 ’ > /etc/resolv.conf
-lynx www.wise.c11.com
+echo 'nameserver 192.168.122.1 ' > /etc/resolv.conf
+
+apt-get update
+apt-get install squid -y
+service squid start
+
+apt-get install php -y
+apt-get install apache2 -y
+apt-get install libapache2-mod-php7.0 -y
+
+mv /etc/squid/squid.conf /etc/squid/squid.conf.bak
+
+echo 'acl WORKDAYS time MTWHF 08:00-17:00
+acl HOLIDAYS time AS 00:00-23:59
+acl DISHTTP url_regex ^http:.*$
+acl WHITELISTS dstdomain loid-work.com franky-work.com
+
+ ' > /etc/squid/acl.conf
+
+echo 'include /etc/squid/acl.conf
+
+http_port 5000
+visible_hostname Berlint
+
+
+http_access allow DISHTTP
+http_access 
+http_access allow WHITELISTS WORKDAYS
+http_access deny WORKDAYS
+# http_access deny DISHTTP
+
+delay_pools 1
+delay_class 1 1
+delay_parameters 1 16000/16000 ' > /etc/squid/squid.conf
+
+service squid restart
 ```
+
+</br>
+
+### **Soal 14**
+**Setelah diterapkan, ternyata peraturan nomor sebelumnya mengganggu produktifitas saat hari kerja, dengan demikian pembatasan kecepatan hanya diberlakukan untuk pengaksesan internet pada hari libur**
+
+Pada Berlint, dilakukan
+
+```bash
+echo 'nameserver 192.168.122.1 ' > /etc/resolv.conf
+
+apt-get update
+apt-get install squid -y
+service squid start
+
+apt-get install php -y
+apt-get install apache2 -y
+apt-get install libapache2-mod-php7.0 -y
+
+mv /etc/squid/squid.conf /etc/squid/squid.conf.bak
+
+echo 'acl WORKDAYS time MTWHF 08:00-17:00
+acl HOLIDAYS time AS 00:00-23:59
+acl DISHTTP url_regex ^http:.*$
+acl WHITELISTS dstdomain loid-work.com franky-work.com
+
+ ' > /etc/squid/acl.conf
+
+echo 'include /etc/squid/acl.conf
+
+http_port 5000
+visible_hostname Berlint
+
+http_access allow WHITELISTS WORKDAYS
+http_access deny WORKDAYS
+http_access deny DISHTTP
+
+delay_pools 1
+delay_class 1 1
+delay_access 1 deny WORKDAYS
+delay_parameters 1 16000/64000 ' > /etc/squid/squid.conf
+
+service squid restart
+```
+
+</br>
+
+**Untuk nomor 9 hingga 14, pengetesan dilakukan dengan menggunakan acuan tabel yang diberikan pada soal sebagai berikut dengan constraint waktu urut yaitu Senin (10.00), Senin (20.00), dan Sabtu (10.00).**
+
+- Akses internet (HTTP) 
+
+![Tes Akses internet (HTTP)](./img/hasil-9-1.png)
+
+![Tes Akses internet (HTTP)](./img/hasil-9-2.png)
+
+![Tes Akses internet (HTTP)](./img/hasil-9-3.png)
+
+</br>
+
+
+- Akses internet (HTTS) 
+
+![Tes Akses internet (HTTS)](./img/hasil-9-4.png)
+
+![Tes Akses internet (HTTS)](./img/hasil-9-5.png)
+
+![Tes Akses internet (HTTS)](./img/hasil-9-6.png)
+
+</br>
+
+- Akses loid-work.com dan franky-work.com
+
+![Tes loid franky](./img/hasil-9-7.png)
+
+![Tes loid franky](./img/hasil-9-8.png)
+
+![Tes loid franky](./img/hasil-9-9.png)
+
+</br>
+
+- Speed limit (128Kbps)
+
+![Tes limit](./img/hasil-9-10.png)
+
+![Tes limit](./img/hasil-9-11.png)
+
+![Tes limit](./img/hasil-9-12.png)
 
 
 </br>
 
-### **Soal 9**
-**Setelah itu, Loid juga membutuhkan agar url www.wise.yyy.com/index.php/home dapat menjadi menjadi www.wise.yyy.com/home**
-
-Pada console Wise dilakukan konfigurasi sebagai berikut.
-
-```bash
-a2enmod rewrite
-service apache2 restart
-
-echo ‘RewriteEngine On
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule (.*) /index.php/\$1 [L] ‘ > /var/www/wise.c11.com/.htaccess
-
-echo ‘<VirtualHost *:80>
-        ServerAdmin webmaster@localhost
-        DocumentRoot /var/www/wise.c11.com
-        ServerName wise.c11.com
-        ServerAlias www.wise.c11.com
-
-        ErrorLog \${APACHE_LOG_DIR}/error.log
-        CustomLog \${APACHE_LOG_DIR}/access.log combined
-
-        <Directory /var/www/wise.c11.com>
-                Options +FollowSymLinks -Multiviews
-                AllowOverride All
-        </Directory>
-</VirtualHost> ‘ > /etc/apache2/sites-available/wise.c11.com.conf
-
-service apache2 restart
-```
-
-</br>
 
 ## **Kendala yang Dihadapi**
 Terdapat beberapa kendala saat pengerjaan praktikum, antara lain sebagai berikut.
