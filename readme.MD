@@ -277,7 +277,7 @@ Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematik
 ### **Soal 6**
 **Client mendapatkan DNS dari WISE dan client dapat terhubung dengan internet melalui DNS tersebut.**
 
-- Pertama, pada Wise
+- Pertama, pada Wise perlu untuk membuat forwarders agar dapat mengakses internet dari Ostania di dalam `/etc/bind/named.conf.options`.
 
 ```bash
 echo ‘options {
@@ -294,7 +294,7 @@ echo ‘options {
 }; ‘ > /etc/bind/named.conf.options
 ```
 
-- Kedua, pada Westalis
+- Kedua, pada Westalis, tepatnya pada `/etc/dhcp/dhcpd.conf`, perlu ditambahkan option DNS, di mana dengan itu setiap client yang mengakses akan diarahkan melewati IP dari Wise. Dengan kata lain, nameserver dari setiap client yang terhubung pada DHCP server adalah IP dari Wise.
 
 ```bash
 echo ‘subnet 10.15.1.0 netmask 255.255.255.0 {
@@ -324,13 +324,12 @@ Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematik
 
 ![Tes DHCP DNS](./img/hasil-6-2.png)
 
-
 </br>
 
 ### **Soal 7**
 **Lama waktu DHCP server meminjamkan alamat IP kepada Client yang melalui Switch1 selama 5 menit sedangkan pada client yang melalui Switch3 selama 10 menit. Dengan waktu maksimal yang dialokasikan untuk peminjaman alamat IP selama 115 menit.**
 
-Pada Westalis
+Pada Westalis, tepatnya pada `/etc/dhcp/dhcpd.conf`, perlu ditambahkan konfigurasi untuk mengatur lease time. Terdapat dua konfigurasi, yaitu default-lease-time (lama waktu DHCP server meminjamkan alamat IP kepada client, dalam satuan detik) serta max-lease-time (waktu maksimal yang di alokasikan untuk peminjaman IP oleh DHCP server ke client dalam satuan detik).
 
 ```bash
 echo ‘subnet 10.15.1.0 netmask 255.255.255.0 {
@@ -360,7 +359,7 @@ service isc-dhcp-server stop
 service isc-dhcp-server start
 ```
 
-Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematikan lalu menyalakannya lagi. Pertama, dilakukan pada node client dengan subnet 10.15.1.0 (Switch 1). Kemudian, dilakukan pada node client dengan subnet 10.15.3.0 (Switch 3)
+Pengetesan dilakukan dengan menunggu hingga waktu lease time habis. Nantinya, IP dari client akan berganti dengan IP yang baru dalam range yang telah ditentukan.
 
 ![Tes DHCP Lease](./img/hasil-7-1.png)
 
@@ -372,7 +371,7 @@ Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematik
 ### **Soal 8**
 **Untuk informasi yang lebih spesifik mengenai Operation Strix, buatlah subdomain melalui Berlint dengan akses strix.operation.wise.yyy.com dengan alias www.strix.operation.wise.yyy.com yang mengarah ke Eden**
 
-- Pertama, pada Westalis ditambahkan
+- Pertama, pada Westalis, tepatnya pada `/etc/dhcp/dhcpd.conf` ditambahkan konfigurasi berikut yang berisi keterangan hardware ethernet dari interface yang mengarah ke DHCP server ataupun relay disertai dengan fixed IP address yang diinginkan. Hardware ethernet ini akan didaftarkan pada DHCP server sehingga DHCP server akan mengetahui interface apa yang memerlukan fixed address.
 
 ```bash
 host Eden {
@@ -384,7 +383,7 @@ service isc-dhcp-server stop
 service isc-dhcp-server start
 ```
 
-- Kedua, pada Eden dilakukan
+- Kedua, pada Eden (atau client yang lain) dilakukan penambahan konfigurasi pada `/etc/network/interfaces`. Konfigurasi tersebut adalah hardware address dari Eden yang akan dikenalkan dan didaftarkan pada DHCP server. Sebenarnya, hardware address cukup ditambahkan pada konfigurasi client, karena pengajuan dilakukan oleh client. Sehingga, apabila konfigurasi hardware address pada DHCP server dihilangkan, maka fixed address akan tetap berjalan.
 
 ```bash
 echo ‘auto eth0
