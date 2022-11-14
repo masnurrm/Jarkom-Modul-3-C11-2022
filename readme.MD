@@ -717,6 +717,8 @@ service squid restart
 
 ![Tes limit](./img/hasil-10-12.png)
 
+![Tes limit](./img/hasil-10-13.png)
+
 
 </br>
 
@@ -725,3 +727,4 @@ service squid restart
 Terdapat beberapa kendala saat pengerjaan praktikum, antara lain sebagai berikut.
 
 1. Tantangan dalam manajemen pekerjaan dan waktu, karena dikerjakan sendiri tanpa adanya pembagian task.
+2. Stuck pada proxy server, tepatnya pada pengaturan HTTPS yang harus tidak dapat diakses pada workdays. Ternyata, squid tidak dapat melakukan filtering https secara umum, tetapi harus spesifik disertai dengan DNS-nya.
