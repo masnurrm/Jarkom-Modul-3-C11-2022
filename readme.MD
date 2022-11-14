@@ -191,38 +191,37 @@ Pengetesan dilakukan dengan melakukan pengecekan status dari masing-masing *serv
 
 </br>
 
-### **Soal 3**
-**Setelah itu ia juga ingin membuat subdomain eden.wise.yyy.com dengan alias www.eden.wise.yyy.com yang diatur DNS-nya di WISE dan mengarah ke Eden**
+### **Soal 2**
+**Dan, Ostania sebagai DHCP Relay**
 
-Pada console Wise dilakukan konfigurasi sebagai berikut. Atur SOA yang telah dibuat sebelumnya dengan menambahkan CNAME baru untuk www, serta Alias untuk `eden` dan `www.eden`
-
-```bash
-echo ‘;
-; BIND data file for local loopback interface
-;
-$TTL    604800
-@       IN      SOA     wise.c11.com. root.wise.c11.com. (
-                              2         ; Serial
-                         604800         ; Refresh
-                          86400         ; Retry
-                        2419200         ; Expire
-                         604800 )       ; Negative Cache TTL
-;
-@       IN      NS      wise.c11.com.
-@       IN      A       10.15.2.2
-@       IN      AAAA    ::1 
-www      IN      CNAME   wise.c11.com.
-eden     IN      A       10.15.3.3
-www.eden IN      A      10.15.3.3’ > /etc/bind/jarkom/wise.c11.com
-```
-
-Terakhir, restart bind9.
+Pada Ostania dilakukan penginstalan `isc-dhcp-relay` untuk menjadi DHCP relay dari DHCP server (Westalis).
 
 ```bash
-service bind9 restart
+apt-get update
+apt-get install isc-dhcp-relay -y
+service isc-dhcp-relay start
 ```
 
-Pengetesan dilakukan dengan melakukan `ping eden.wise.c11.com` atau `ping www.eden.wise.c11.com` pada node client (Garden atau SSS). Bukti terlampir pada folder `img`.
+Setelah penginstalan, kemudian dilakukan konfigurasi ke mana acuan dari DHCP relay. Dalam kasus ini, acuannya adalah DHCP server, sehingga digunakan IP dari Westalis. Selanjutnya, dilakukan pendaftaran interface dari Ostania yang digunakan untuk menjadi jalan bagi node client untuk terhubung. Sehingga, terdapat tiga interface, yaitu `eth1 eth2 eth3`. Konfigurasi tersabut disimpan pada `etc/default/isc-dhcp-relay`.
+
+```bash
+echo ‘SERVERS="10.15.2.4"
+INTERFACES="eth1 eth2 eth3"
+OPTIONS= ‘ > /etc/default/isc-dhcp-relay
+```
+
+Tidak lupa, dilakukan forwarding untuk ipv4.
+
+```bash
+echo ‘net.ipv4.ip_forward=1 ‘ >> /etc/sysctl.conf
+
+service isc-dhcp-relay restart
+```
+
+Pengetesan dilakukan dengan melakukan pengecekan status dari masing-masing *service* yang telah terpasang.
+
+![Tes Ostania](./img/hasil-2-1.png)
+
 
 </br>
 
