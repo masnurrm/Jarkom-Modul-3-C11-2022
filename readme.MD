@@ -363,8 +363,6 @@ Pengetesan dilakukan dengan menunggu hingga waktu lease time habis. Nantinya, IP
 
 ![Tes DHCP Lease](./img/hasil-7-1.png)
 
-![Tes DHCP Lease](./img/hasil-7-2.png)
-
 
 </br>
 
@@ -391,7 +389,7 @@ iface eth0 inet dhcp
 hwaddress ether 5a:4f:c1:11:9f:cd ‘ > /etc/network/interfaces
 ```
 
-Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematikan lalu menyalakannya lagi. Pertama, dilakukan pada node client dengan subnet 10.15.1.0 (Switch 1). Kemudian, dilakukan pada node client dengan subnet 10.15.3.0 (Switch 3)
+Pengetesan dilakukan dengan melakukan pengecekan pada node client, yaitu Eden. Pengecekan dilakukan dengan mematikan lalu menyalakan lagi untuk mengecek IP yang diperoleh Eden. Selanjutnya, dimatikan lalu dinyalakan lagi. Jika konfigurasi fixed address berhasil, maka Eden akan selalu memperoleh IP yang sama, yaitu 10.15.3.13 sebagai berikut.
 
 ![Tes DHCP Fixed](./img/hasil-8-1.png)
 
@@ -402,7 +400,7 @@ Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematik
 ### **Soal 9**
 **SSS digunakan sebagai client Proxy agar pertukaran informasi dapat terjamin keamanannya, juga untuk mencegah kebocoran data. Pada Proxy Server di SSS, Loid berencana untuk mengatur bagaimana Client dapat mengakses internet. Artinya setiap client harus menggunakan SSS sebagai HTTP dan HTTPS proxy.**
 
-- Pertama, pada Berlint
+- Pertama, pada Berlint perlu dilakukan penambahan konfigurasi port dan hostname pada `/etc/squid/squid.conf`. Pada kasus ini, digunakan port 5000 yang selanjutnya akan menjadi acuan di nomor berikutnya.
 
 ```bash
 apt-get update
@@ -415,33 +413,36 @@ apt-get install libapache2-mod-php7.0 -y
 
 mv /etc/squid/squid.conf /etc/squid/squid.conf.bak
 
-echo ‘http_port 8080
+echo ‘http_port 5000
 visible_hostname Berlint ‘ > /etc/squid/squid.conf
 
 service squid restart
 ```
 
-- Kedua, pada SSS 
+- Kedua, pada SSS (atau client lainnya), dilakukan pengaktifan proxy dengan menggunakan export `http_proxy="http://10.15.2.3:5000"`. Dengan itu, client telah terhubung dengan Proxy server. Selain itu di sini juga dilakukan pemasangan lynx untuk melakukan pengetesan pada nomor-nomor berikutnya.
 
 ```bash
-export http_proxy="http://10.15.2.3:8080"
+export http_proxy="http://10.15.2.3:5000"
 apt-get update
 apt-get install lynx
 ```
 
-Pengetesan dilakukan dengan melakukan pengecekan pada node client dengan mematikan lalu menyalakannya lagi. Pertama, dilakukan pada node client dengan subnet 10.15.1.0 (Switch 1). Kemudian, dilakukan pada node client dengan subnet 10.15.3.0 (Switch 3)
+Pengetesan dilakukan dengan melakukan pengecekan apakah *service* telah berjalan atau belum.
 
 ![Tes Client Proxy](./img/hasil-9-1.png)
-
-![Tes Client Proxy](./img/hasil-9-2.png)
 
 
 </br>
 
+**Soal mengenai Proxy server akan dilakukan pengecekan di akhir.**
+
+</br>
+
+
 ### **Soal 10**
 **Client hanya dapat mengakses internet diluar (selain) hari dan jam kerja (senin-jumat 08.00 - 17.00) dan hari libur (dapat mengakses 24 jam penuh)**
 
-Pada Berlint, dilakukan
+Pada Berlint, dilakukan penambahan acknowledge untuk squid pada `/etc/squid/acl.conf`. Di sini ditambahkan acknowledge berupa jam WORKDAYS dan HOLIDAYS. Acknowledge tersebut selanjutnya digunakan pada konfigurasi squid di `/etc/squid/squid.conf`.
 
 ```bash
 echo 'nameserver 192.168.122.1 ' > /etc/resolv.conf
@@ -475,7 +476,7 @@ service squid restart
 ### **Soal 11**
 **Adapun pada hari dan jam kerja sesuai nomor sebelumnya, client hanya dapat mengakses domain loid-work.com dan franky-work.com**
 
-- Pertama, pada Wise dilakukan
+- Pertama, pada Wise dilakukan penambahan konfigurasi DNS untuk loid-work.com serta franky-work.com seperti pada modul sebelumnya. 
 
 ```bash
 # echo ’zone "franky-work.com" {
@@ -510,10 +511,35 @@ $TTL    604800
 www      IN      CNAME   loid-work.com.’ > /etc/bind/jarkom/loid-work.com
 ```
 
-- Kedua, pada Berlint dilakukan
+- Kedua, pada pada Berlint, dilakukan penambahan acknowledge untuk squid pada `/etc/squid/acl.conf`. Di sini ditambahkan acknowledge berupa WHITELIST yang berisikan DNS dari loid-work.com dan franky-work.com. Acknowledge ini ditambahkan beriringan dengan WORKDAYS (operasi AND) pada konfigurasi `/etc/squid/squid.conf`.
 
 ```bash
+echo 'nameserver 192.168.122.1 ' > /etc/resolv.conf
 
+apt-get update
+apt-get install squid -y
+service squid start
+
+apt-get install php -y
+apt-get install apache2 -y
+apt-get install libapache2-mod-php7.0 -y
+
+mv /etc/squid/squid.conf /etc/squid/squid.conf.bak
+
+echo 'acl WORKDAYS time MTWHF 08:00-17:00
+acl HOLIDAYS time AS 00:00-23:59
+acl WHITELISTS dstdomain loid-work.com franky-work.com  ' > /etc/squid/acl.conf
+
+echo 'include /etc/squid/acl.conf
+
+http_port 5000
+visible_hostname Berlint
+http_access allow HOLIDAYS
+http_access allow WHITELISTS WORKDAYS
+http_access deny WORKDAYS
+http_access allow all ' > /etc/squid/squid.conf
+
+service squid restart
 ```
 
 </br>
@@ -521,7 +547,7 @@ www      IN      CNAME   loid-work.com.’ > /etc/bind/jarkom/loid-work.com
 ### **Soal 12**
 **Saat akses internet dibuka, client dilarang untuk mengakses web tanpa HTTPS. (Contoh web HTTP: http://example.com)**
 
-Pada Berlint, dilakukan
+Pada Berlint, dilakukan penambahan acknowledge untuk squid pada `/etc/squid/acl.conf`. Di sini ditambahkan acknowledge berupa DISHTTP yang berisikan regex dari suatu string URL yang diawali substring `http://`.  
 
 ```bash
 echo 'nameserver 192.168.122.1 ' > /etc/resolv.conf
@@ -539,18 +565,18 @@ mv /etc/squid/squid.conf /etc/squid/squid.conf.bak
 echo 'acl WORKDAYS time MTWHF 08:00-17:00
 acl HOLIDAYS time AS 00:00-23:59
 acl DISHTTP url_regex ^http:.*$
-acl WHITELISTS dstdomain loid-work.com franky-work.com
-
- ' > /etc/squid/acl.conf
+acl WHITELISTS dstdomain loid-work.com franky-work.com ' > /etc/squid/acl.conf
 
 echo 'include /etc/squid/acl.conf
 
 http_port 5000
 visible_hostname Berlint
 
+http_access allow HOLIDAYS
 http_access allow WHITELISTS WORKDAYS
 http_access deny WORKDAYS
-http_access deny DISHTTP ' > /etc/squid/squid.conf
+http_access deny DISHTTP 
+http_access allow all ' > /etc/squid/squid.conf
 
 service squid restart
 ```
@@ -560,7 +586,7 @@ service squid restart
 ### **Soal 13**
 **Agar menghemat penggunaan, akses internet dibatasi dengan kecepatan maksimum 128 Kbps pada setiap host (Kbps = kilobit per second; lakukan pengecekan pada tiap host, ketika 2 host akses internet pada saat bersamaan, keduanya mendapatkan speed maksimal yaitu 128 Kbps)**
 
-Pada Berlint, dilakukan
+Pada Berlint, dilakukan penambahan konfigurasi dari `/etc/squid/squid.conf`. Penambahan tersebut terdiri dari beberapa konfigurasi, yaitu delay pools (untuk menampung pool IP yang terhubung dengan Proxy server), delay class (untuk mengatur pilihan coverage dari pengaturan limit bandwidth yang diterapkan), dan delay parameters (untuk mengatur limit bandwidth serta minimal file size agar limit bandwidth berjalan). 
 
 ```bash
 echo 'nameserver 192.168.122.1 ' > /etc/resolv.conf
@@ -587,12 +613,11 @@ echo 'include /etc/squid/acl.conf
 http_port 5000
 visible_hostname Berlint
 
-
-http_access allow DISHTTP
-http_access 
+http_access allow HOLIDAYS
 http_access allow WHITELISTS WORKDAYS
 http_access deny WORKDAYS
-# http_access deny DISHTTP
+http_access deny DISHTTP 
+http_access allow all
 
 delay_pools 1
 delay_class 1 1
@@ -601,12 +626,14 @@ delay_parameters 1 16000/16000 ' > /etc/squid/squid.conf
 service squid restart
 ```
 
+Untuk delay pools, dipilih 1 yang berarti semua IP yang terhubung Proxy server saat ini. Untuk delay class, dipilih 1 1 yang berarti semua pools IP tersebut akan diterapkan pengaturan limit bandwidth tanpa satupun client terkecuali. Terakhir, untuk delay parameters dipilih 16000 (dalam byte), yang berarti 16000 * 8 = 128000 (dalam bit).
+
 </br>
 
 ### **Soal 14**
 **Setelah diterapkan, ternyata peraturan nomor sebelumnya mengganggu produktifitas saat hari kerja, dengan demikian pembatasan kecepatan hanya diberlakukan untuk pengaksesan internet pada hari libur**
 
-Pada Berlint, dilakukan
+Pada Berlint, dilakukan penambahan konfigurasi dari `/etc/squid/squid.conf`, yaitu dengan menambah delay access dengan nilai 1 (berlaku untuk semua pools IP) dengan konfigurasi deny WORKDAYS (konfigurasi tersebut tidak akan diberlakukan pada hari kerja, yang berarti diberlakukan pada hari libur). 
 
 ```bash
 echo 'nameserver 192.168.122.1 ' > /etc/resolv.conf
@@ -633,9 +660,11 @@ echo 'include /etc/squid/acl.conf
 http_port 5000
 visible_hostname Berlint
 
+http_access allow HOLIDAYS
 http_access allow WHITELISTS WORKDAYS
 http_access deny WORKDAYS
-http_access deny DISHTTP
+http_access deny DISHTTP 
+http_access allow all
 
 delay_pools 1
 delay_class 1 1
@@ -651,42 +680,42 @@ service squid restart
 
 - Akses internet (HTTP) 
 
-![Tes Akses internet (HTTP)](./img/hasil-9-1.png)
+![Tes Akses internet (HTTP)](./img/hasil-10-1.png)
 
-![Tes Akses internet (HTTP)](./img/hasil-9-2.png)
+![Tes Akses internet (HTTP)](./img/hasil-10-2.png)
 
-![Tes Akses internet (HTTP)](./img/hasil-9-3.png)
+![Tes Akses internet (HTTP)](./img/hasil-10-3.png)
 
 </br>
 
 
-- Akses internet (HTTS) 
+- Akses internet (HTTPS) 
 
-![Tes Akses internet (HTTS)](./img/hasil-9-4.png)
+![Tes Akses internet (HTTS)](./img/hasil-10-4.png)
 
-![Tes Akses internet (HTTS)](./img/hasil-9-5.png)
+![Tes Akses internet (HTTS)](./img/hasil-10-5.png)
 
-![Tes Akses internet (HTTS)](./img/hasil-9-6.png)
+![Tes Akses internet (HTTS)](./img/hasil-10-6.png)
 
 </br>
 
 - Akses loid-work.com dan franky-work.com
 
-![Tes loid franky](./img/hasil-9-7.png)
+![Tes loid franky](./img/hasil-10-7.png)
 
-![Tes loid franky](./img/hasil-9-8.png)
+![Tes loid franky](./img/hasil-10-8.png)
 
-![Tes loid franky](./img/hasil-9-9.png)
+![Tes loid franky](./img/hasil-10-9.png)
 
 </br>
 
 - Speed limit (128Kbps)
 
-![Tes limit](./img/hasil-9-10.png)
+![Tes limit](./img/hasil-10-10.png)
 
-![Tes limit](./img/hasil-9-11.png)
+![Tes limit](./img/hasil-10-11.png)
 
-![Tes limit](./img/hasil-9-12.png)
+![Tes limit](./img/hasil-10-12.png)
 
 
 </br>
