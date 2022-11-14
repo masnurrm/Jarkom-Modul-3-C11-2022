@@ -1,4 +1,4 @@
-# **Jarkom-Modul-2-C11-2022**
+# **Jarkom-Modul-3-C11-2022**
 
 *Repository* ini berisi laporan resmi dari praktikum modul 3 dari mata kuliah Jaringan Komputer tahun 2022.
 
@@ -15,12 +15,14 @@
 
 Laporan ini berisi penjelasan dari soal-soal yang dikerjakan pada modul 3 hingga masa revisi selesai.
 
+</br>
+
 ### **Persiapan**
 **Sebelum pengerjaan soal, perlu dibuat topologi dengan konfigurasinya**
 
 ![Gambar Topologi yang Dibuat](./img/Topologi.png)
 
-Setelah mengatur susunan topologi, selanjutnya dilakukan beberapa konfigurasi untuk tiap *node* dan juga *router* pada setiap *port* yang digunakan atau tersambung. Awalnya, semua node akan di-*assign* IP secara manual (static IP)
+Setelah mengatur susunan topologi, selanjutnya dilakukan beberapa konfigurasi untuk tiap node dan juga router pada setiap port yang digunakan atau tersambung. Awalnya, semua node akan di-assign IP secara manual (static IP)
 
 - **Konfigurasi IP Address**
 
@@ -210,7 +212,7 @@ INTERFACES="eth1 eth2 eth3"
 OPTIONS= ‘ > /etc/default/isc-dhcp-relay
 ```
 
-Tidak lupa, dilakukan forwarding untuk ipv4.
+Tidak lupa, dilakukan forwarding untuk ipv4 pada `/etc/sysctl.conf`.
 
 ```bash
 echo ‘net.ipv4.ip_forward=1 ‘ >> /etc/sysctl.conf
@@ -235,7 +237,7 @@ Pengetesan dilakukan dengan melakukan pengecekan status dari masing-masing *serv
 
 Ketiga soal ini dikerjakan menjadi satu karena sangat saling bergantung satu sama lain.
 
-- Pertama, pada Westalis
+- Pertama, pada Westalis dilakukan tambahan konfigurasi pada tiap subnet yang menjadi interfacenya di dalam `/etc/dhcp/dhcpd.conf`. Namun, interface di sini adalah interface dari Ostania yang merupakan relay dari DHCP server (Westalis). Sehingga terdapat tiga subnet yang perlu diatur. Hal yang perlu dikonfigurasi adalah range dari subnet, gateway, serta broadcast-nya. Namun, pada subnet kedua tidak ada konfigurasi karena bukan merupakan subnet untuk client dari DHCP.
 
 ```bash
 echo ‘subnet 10.15.1.0 netmask 255.255.255.0 {
@@ -257,7 +259,7 @@ service isc-dhcp-server stop
 service isc-dhcp-server start
 ```
 
-- Kedua, pada setiap node client 
+- Kedua, pada setiap node client dari DHCP, konfigurasi interface pada `/etc/network/interfaces` yang sebelumnya statis diubah menjadi dhcp agar dapat menerima leasing IP dari DHCP server.
 
 ```bash
 echo ‘auto eth0
